@@ -29,7 +29,7 @@
                     "CNN_128_256", "CNN_128_384", "CNN_128_512", "CNN_256_256", "CNN_256_512", 
                     "CNN_64_128_256", "CNN_64_128_192", "CNN_128_192_256", "CNN_128_128_128", "CNN_128_128_192"],
     "early_stopping" : True,
-    "N_parties": 10,
+    "N_parties": 20,
     "N_samples_per_class": 3,
     "N_alignment": 10000, 
     "private_classes": [0,2,20,63,71,82],
