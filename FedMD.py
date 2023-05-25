@@ -6,13 +6,18 @@ import tensorflow as tf
 from data_utils import generate_alignment_data
 from Neural_Networks import remove_last_layer
 
+from utility import * 
+
+
+
+
 class FedMD():
     def __init__(self, parties, public_dataset, 
                  private_data, total_private_data,  
                  private_test_data, N_alignment,
                  N_rounds, 
                  N_logits_matching_round, logits_matching_batchsize, 
-                 N_private_training_round, private_training_batchsize):
+                 N_private_training_round, private_training_batchsize, aug = False, compress = False):
         
         self.N_parties = len(parties)
         self.public_dataset = public_dataset
@@ -21,6 +26,8 @@ class FedMD():
         self.N_alignment = N_alignment
         
         self.N_rounds = N_rounds
+        self.aug = aug
+        self.compress = compress
         self.N_logits_matching_round = N_logits_matching_round
         self.logits_matching_batchsize = logits_matching_batchsize
         self.N_private_training_round = N_private_training_round
@@ -29,25 +36,25 @@ class FedMD():
         self.collaborative_parties = []
         self.init_result = []
         
-        print("start model initialization: ")
+        # print("start model initialization: ")
         for i in range(self.N_parties):
             print("model ", i)
             model_A_twin = None
             model_A_twin = clone_model(parties[i])
             model_A_twin.set_weights(parties[i].get_weights())
-            model_A_twin.compile(optimizer=tf.keras.optimizers.Adam(lr = 1e-3), 
+            model_A_twin.compile(optimizer=tf.keras.optimizers.Adam(lr = 1e-4), 
                                  loss = "sparse_categorical_crossentropy",
                                  metrics = ["accuracy"])
             
-            print("start full stack training ... ")        
+        #     print("start full stack training ... ")        
             
-            model_A_twin.fit(private_data[i]["X"], private_data[i]["y"],
-                             batch_size = 32, epochs = 25, shuffle=True, verbose = 0,
-                             validation_data = [private_test_data["X"], private_test_data["y"]],
-                             callbacks=[EarlyStopping(monitor='val_accuracy', min_delta=0.001, patience=10)]
-                            )
+        #     model_A_twin.fit(private_data[i]["X"], private_data[i]["y"],
+        #                      batch_size = 32, epochs = 50, shuffle=True, verbose = True,
+        #                      validation_data = [private_test_data["X"], private_test_data["y"]],
+        #                      callbacks=[EarlyStopping(monitor="val_accuracy", min_delta=0.0001, patience=4)]
+        #                     )
             
-            print("full stack training done")
+        #     print("full stack training done")
             
             model_A = remove_last_layer(model_A_twin, loss="mean_absolute_error")
             
@@ -55,60 +62,87 @@ class FedMD():
                                                "model_classifier": model_A_twin,
                                                "model_weights": model_A_twin.get_weights()})
             
-            self.init_result.append({"val_acc": model_A_twin.history.history['val_accuracy'],
-                                     "train_acc": model_A_twin.history.history['accuracy'],
-                                     "val_loss": model_A_twin.history.history['val_loss'],
-                                     "train_loss": model_A_twin.history.history['loss'],
-                                    })
+        #     self.init_result.append({"val_acc": model_A_twin.history.history['val_accuracy'],
+        #                              "train_acc": model_A_twin.history.history['accuracy'],
+        #                              "val_loss": model_A_twin.history.history['val_loss'],
+        #                              "train_loss": model_A_twin.history.history['loss'],
+        #                             })
             
-            print()
-            del model_A, model_A_twin
-        #END FOR LOOP
+        #     print()
+        #     del model_A, model_A_twin
+        # #END FOR LOOP
         
-        print("calculate the theoretical upper bounds for participants: ")
+        # print("calculate the theoretical upper bounds for participants: ")
         
-        self.upper_bounds = []
-        self.pooled_train_result = []
-        for model in parties:
-            model_ub = clone_model(model)
-            model_ub.set_weights(model.get_weights())
-            model_ub.compile(optimizer=tf.keras.optimizers.Adam(lr = 1e-3),
-                             loss = "sparse_categorical_crossentropy", 
-                             metrics = ["accuracy"])
+        # self.upper_bounds = []
+        # self.pooled_train_result = []
+        # for model in parties:
+        #     model_ub = clone_model(model)
+        #     model_ub.set_weights(model.get_weights())
+        #     model_ub.compile(optimizer=tf.keras.optimizers.Adam(lr = 1e-5),
+        #                      loss = "sparse_categorical_crossentropy", 
+        #                      metrics = ["accuracy"])
             
-            model_ub.fit(total_private_data["X"], total_private_data["y"],
-                         batch_size = 32, epochs = 50, shuffle=True, verbose = 0, 
-                         validation_data = [private_test_data["X"], private_test_data["y"]],
-                         callbacks=[EarlyStopping(monitor="val_accuracy", min_delta=0.001, patience=10)])
+        #     model_ub.fit(total_private_data["X"], total_private_data["y"],
+        #                  batch_size = 32, epochs = 50, shuffle=True, verbose = True, 
+        #                  validation_data = [private_test_data["X"], private_test_data["y"]],
+        #                  callbacks=[EarlyStopping(monitor="val_accuracy", min_delta=0.0001, patience=4)])
             
-            self.upper_bounds.append(model_ub.history.history["val_accuracy"][-1])
-            self.pooled_train_result.append({"val_acc": model_ub.history.history["val_accuracy"], 
-                                             "acc": model_ub.history.history["accuracy"]})
+        #     self.upper_bounds.append(model_ub.history.history["val_accuracy"][-1])
+        #     self.pooled_train_result.append({"val_acc": model_ub.history.history["val_accuracy"], 
+        #                                      "acc": model_ub.history.history["accuracy"]})
             
-            del model_ub    
-        print("the upper bounds are:", self.upper_bounds)
+        #     del model_ub    
+        # print("the upper bounds are:", self.upper_bounds)
     
     def collaborative_training(self):
         # start collaborating training    
         collaboration_performance = {i: [] for i in range(self.N_parties)}
         r = 0
         while True:
-            # At beginning of each round, generate new alignment dataset
-            alignment_data = generate_alignment_data(self.public_dataset["X"], 
-                                                     self.public_dataset["y"],
-                                                     self.N_alignment)
             
+            if not self.aug : 
+                # At beginning of each round, generate new alignment dataset
+                alignment_data = generate_alignment_data(self.public_dataset["X"], 
+                                                        self.public_dataset["y"],
+                                                        self.N_alignment)
+                
+            else : 
+                print("augmenting public dataset ... ")
+                alpha = np.random.randint(1, 1_000_000)
+                beta = np.random.randint(1, 1000)
+                lambdaa = np.random.beta(alpha, alpha)
+                
+                np.random.seed(beta) 
+                index = np.random.permutation(len(self.public_dataset["X"]))  
+                new_public_dataset_x = lambdaa * self.public_dataset["X"] + (1 - lambdaa) * self.public_dataset["X"][index]
+                new_public_dataset_y = lambdaa * self.public_dataset["y"] + (1 - lambdaa) * self.public_dataset["y"][index]
+
+                # At beginning of each round, generate new alignment dataset
+                alignment_data = generate_alignment_data(new_public_dataset_x, 
+                                                        new_public_dataset_y,
+                                                        self.N_alignment)
+            
+            
+
             print("round ", r)
             
             print("update logits ... ")
             # update logits
-            logits = 0
+            print("aug:{0}, compress:{1}, N_alignment:{2}".format(self.aug, self.compress, self.N_alignment))
+            print("collaborative parties", len(self.collaborative_parties))
+            print("size of alignment data {0}, length: {1}".format(size_of(alignment_data['y']), len(alignment_data["y"])))
+            local_logits = []
             for d in self.collaborative_parties:
                 d["model_logits"].set_weights(d["model_weights"])
-                logits += d["model_logits"].predict(alignment_data["X"], verbose = 0)
+                local_logits.append(d["model_logits"].predict(alignment_data["X"], verbose = 0))
                 
-            logits /= self.N_parties
-            
+            logits = aggregate(local_logits, self.compress)
+            print("size of local soft labels:{0}, size of global soft labels:{1}".format(size_of(local_logits[0]), size_of(logits)))
+            print("length of local soft labels:{0}, length of global soft labels:{1}".format(len(local_logits[0]), len(logits)))
+            print("type of local soft labels:{0}, type of global soft labels:{1}".format(local_logits[0].dtype, logits.dtype))
+            return 
+        
             # test performance
             print("test performance ... ")
             
@@ -134,6 +168,7 @@ class FedMD():
                 weights_to_use = d["model_weights"]
 
                 d["model_logits"].set_weights(weights_to_use)
+                print("fitting")
                 d["model_logits"].fit(alignment_data["X"], logits, 
                                       batch_size = self.logits_matching_batchsize,  
                                       epochs = self.N_logits_matching_round, 

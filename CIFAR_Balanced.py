@@ -56,9 +56,15 @@ if __name__ == "__main__":
         private_training_batchsize = conf_dict["private_training_batchsize"]
         N_logits_matching_round = conf_dict["N_logits_matching_round"]
         logits_matching_batchsize = conf_dict["logits_matching_batchsize"]
+        aug = conf_dict["aug"]
+        compress = conf_dict["compress"]
         
         
         result_save_dir = conf_dict["result_save_dir"]
+        if aug : 
+            result_save_dir = result_save_dir + "_aug"
+        if compress:
+            result_save_dir = result_save_dir + "_compress"
 
     
     del conf_dict, conf_file
@@ -119,18 +125,18 @@ if __name__ == "__main__":
                                                input_shape=(32,32,3),
                                                **model_params)
             print("model {0} : {1}".format(i, model_saved_names[i]))
-            print(tmp.summary())
+            # print(tmp.summary())
             parties.append(tmp)
             
             del model_name, model_params, tmp
         #END FOR LOOP
-        pre_train_result = train_models(parties, 
-                                        X_train_CIFAR10, y_train_CIFAR10, 
-                                        X_test_CIFAR10, y_test_CIFAR10,
-                                        save_dir = model_saved_dir, save_names = model_saved_names,
-                                        early_stopping = is_early_stopping,
-                                        **pre_train_params
-                                       )
+        # pre_train_result = train_models(parties, 
+        #                                 X_train_CIFAR10, y_train_CIFAR10, 
+        #                                 X_test_CIFAR10, y_test_CIFAR10,
+        #                                 save_dir = model_saved_dir, save_names = model_saved_names,
+        #                                 early_stopping = is_early_stopping,
+        #                                 **pre_train_params
+        #                                )
     else:
         dpath = os.path.abspath(model_saved_dir)
         model_names = os.listdir(dpath)
@@ -152,10 +158,10 @@ if __name__ == "__main__":
                   N_logits_matching_round = N_logits_matching_round,
                   logits_matching_batchsize = logits_matching_batchsize, 
                   N_private_training_round = N_private_training_round, 
-                  private_training_batchsize = private_training_batchsize)
+                  private_training_batchsize = private_training_batchsize, aug = aug, compress = compress) 
     
-    initialization_result = fedmd.init_result
-    pooled_train_result = fedmd.pooled_train_result
+    # initialization_result = fedmd.init_result
+    # pooled_train_result = fedmd.pooled_train_result
     
     collaboration_performance = fedmd.collaborative_training()
     
@@ -169,12 +175,12 @@ if __name__ == "__main__":
                 raise    
     
     
-    with open(os.path.join(save_dir_path, 'pre_train_result.pkl'), 'wb') as f:
-        pickle.dump(pre_train_result, f, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(os.path.join(save_dir_path, 'init_result.pkl'), 'wb') as f:
-        pickle.dump(initialization_result, f, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(os.path.join(save_dir_path, 'pooled_train_result.pkl'), 'wb') as f:
-        pickle.dump(pooled_train_result, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open(os.path.join(save_dir_path, 'pre_train_result.pkl'), 'wb') as f:
+    #     pickle.dump(pre_train_result, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open(os.path.join(save_dir_path, 'init_result.pkl'), 'wb') as f:
+    #     pickle.dump(initialization_result, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open(os.path.join(save_dir_path, 'pooled_train_result.pkl'), 'wb') as f:
+    #     pickle.dump(pooled_train_result, f, protocol=pickle.HIGHEST_PROTOCOL)
     with open(os.path.join(save_dir_path, 'col_performance.pkl'), 'wb') as f:
         pickle.dump(collaboration_performance, f, protocol=pickle.HIGHEST_PROTOCOL)
         

@@ -2,6 +2,45 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
+
+
+# a function that calculates keras model size in KB
+def get_model_size(model):
+    size = model.count_params() * 4 / 1e3
+    return size
+
+# a function that calculates numpy array size in KB
+def get_array_size(array):
+    size = array.nbytes / 1e3
+    return size
+
+def size_of(obj) : 
+    # if obj is a numpy array
+    if isinstance(obj, np.ndarray) :
+        return get_array_size(obj)
+    else: 
+        return get_model_size(obj)
+    
+
+
+
+def aggregate(soft_labels, compress) : 
+    soft_labels = np.array(soft_labels)
+    
+    if compress : 
+        n_sl = soft_labels - soft_labels.min(axis = 1, keepdims = True)
+        n_sl = n_sl / n_sl.max(axis = 1, keepdims = True)
+        n_sl = n_sl * 255
+        n_sl = n_sl.astype(np.uint8)
+        global_sl = np.mean(n_sl, axis = 0).astype(np.uint8)
+    else : 
+        global_sl = np.mean(soft_labels, axis = 0)
+    
+    
+    return global_sl 
+
+
 def show_dataset_samples(classes, samples_per_class, 
                          images, labels, data_type="MNIST"):
     num_classes = len(classes)
